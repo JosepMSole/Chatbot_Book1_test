@@ -2,8 +2,10 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <title>Mis asistentes de libros</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Wizard Chatbot de Libro (cortes inteligentes)</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- Intento de pdf.js (opcional): si no carga, seguimos -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <style>
     :root {
       --bg: #0f172a;
@@ -12,66 +14,506 @@
       --text: #e2e8f0;
     }
     body {
-      margin: 0;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: radial-gradient(circle at top, #0f172a 0%, #020617 50%, #000 100%);
+      background: var(--bg);
       color: var(--text);
-      min-height: 100vh;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      margin: 0;
       display: flex;
-      align-items: center;
       justify-content: center;
-      padding: 1.5rem;
+      padding: 2rem;
+    }
+    .container { width: min(100%, 900px); }
+    h1, h2 { margin-top: 0; }
+    .stepper { display: flex; gap: .5rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+    .step {
+      background: rgba(15,23,42,.4);
+      border: 1px solid transparent;
+      padding: .5rem 1rem;
+      border-radius: 999px;
+      cursor: pointer;
+      display: flex;
+      gap: .5rem;
+      align-items: center;
+      font-size: .9rem;
+      transition: .15s;
+    }
+    .step.active {
+      background: rgba(56,189,248,.15);
+      border-color: rgba(56,189,248,.6);
     }
     .card {
-      background: rgba(15, 23, 42, 0.6);
-      border: 1px solid rgba(148, 163, 184, 0.15);
-      border-radius: 1.25rem;
-      padding: 2rem 2.5rem;
-      text-align: center;
-      max-width: 420px;
-      width: 100%;
-      box-shadow: 0 18px 40px rgba(0,0,0,.35);
-      backdrop-filter: blur(8px);
-    }
-    h1 {
-      margin-top: 0;
-      font-size: 1.5rem;
-    }
-    p {
-      opacity: .7;
+      background: var(--card);
+      border: 1px solid rgba(148,163,184,.15);
+      border-radius: 1rem;
+      padding: 1.5rem;
       margin-bottom: 1.5rem;
+      box-shadow: 0 10px 35px rgba(0,0,0,.2);
     }
+    label { display: block; font-size: .8rem; opacity: .8; margin-bottom: .35rem; margin-top: 1rem; }
+    input, textarea {
+      width: 100%;
+      background: rgba(15,23,42,.4);
+      border: 1px solid rgba(148,163,184,.25);
+      border-radius: .75rem;
+      padding: .6rem .7rem;
+      color: white;
+      font-size: .9rem;
+    }
+    textarea { min-height: 120px; }
     button {
       background: var(--accent);
       border: none;
-      color: #020617;
+      color: #0f172a;
       font-weight: 600;
-      border-radius: 999px;
-      padding: .8rem 1.4rem;
+      border-radius: .75rem;
+      padding: .6rem 1rem;
       cursor: pointer;
-      font-size: .9rem;
-      transition: transform .1s ease-out;
-      width: 100%;
     }
-    button:hover {
-      transform: translateY(-1px);
+    button.secondary { background: rgba(148,163,184,.15); color: white; }
+    .muted { opacity: .6; font-size: .8rem; }
+    .two { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    .nav-buttons { display: flex; justify-content: space-between; gap: 1rem; margin-top: 1.5rem; }
+    .nav-buttons .right { margin-left: auto; display: flex; gap: .75rem; }
+    .error { color: #f97316; font-size: .8rem; margin-top: .5rem; }
+    pre {
+      background: #020617;
+      padding: 1rem;
+      border-radius: .75rem;
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-height: 200px;
+      overflow-y: auto;
     }
-    small {
-      display: block;
-      margin-top: 1.5rem;
-      opacity: .4;
-      font-size: .7rem;
+    @media (max-width: 700px) {
+      .two { grid-template-columns: 1fr; }
+      body { padding: 1rem; }
+      .nav-buttons { flex-direction: column; }
+      .nav-buttons .right { margin-left: 0; }
     }
   </style>
 </head>
 <body>
-  <div class="card">
-    <h1>Asistentes de mis libros</h1>
-    <p>Elige el asistente para hablar sobre el libro.</p>
-    <button onclick="location.href='LIBRO1/chat.html'">
-      Asistente Libro 1
-    </button>
-    <small>Pon más botones aquí para Libro 2, 3…</small>
+  <div class="container">
+    <h1>Wizard: chatbot por libro</h1>
+    <p class="muted">Versión con cortes inteligentes por frases y párrafos.</p>
+
+    <div class="stepper">
+      <div class="step active" data-step="1">1. Datos</div>
+      <div class="step" data-step="2">2. PDF / Texto</div>
+      <div class="step" data-step="3">3. Troceo</div>
+      <div class="step" data-step="4">4. Config</div>
+      <div class="step" data-step="5">5. Exportar</div>
+    </div>
+
+    <!-- STEP 1 -->
+    <div class="card step-card" data-step="1">
+      <h2>1. Datos del libro</h2>
+      <div class="two">
+        <div>
+          <label for="bookId">ID del libro</label>
+          <input id="bookId" value="relatos-1" />
+        </div>
+        <div>
+          <label for="bookTitle">Título</label>
+          <input id="bookTitle" value="Relatos cortos, Vol. 1" />
+        </div>
+      </div>
+      <label for="bookAuthor">Autor</label>
+      <input id="bookAuthor" value="Yo mismo" />
+      <div id="err1" class="error" style="display:none"></div>
+      <div class="nav-buttons">
+        <div></div>
+        <div class="right">
+          <button type="button" id="next1">Siguiente →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 2 -->
+    <div class="card step-card" data-step="2" style="display:none">
+      <h2>2. Subir PDF o pegar texto</h2>
+      <p class="muted" id="pdfInfoMuted">Si el lector de PDF no carga, pega el texto abajo.</p>
+      <input type="file" id="pdfInput" accept="application/pdf" />
+      <p class="muted" id="pdfStatus">Ningún PDF procesado.</p>
+      <label for="manualText">O pega el texto aquí:</label>
+      <textarea id="manualText" placeholder="Pega aquí el contenido si el PDF no se ha podido leer..."></textarea>
+      <div id="err2" class="error" style="display:none"></div>
+      <div class="nav-buttons">
+        <button type="button" class="secondary" id="prev2">← Anterior</button>
+        <div class="right">
+          <button type="button" id="next2">Siguiente →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 3 -->
+    <div class="card step-card" data-step="3" style="display:none">
+      <h2>3. Troceo</h2>
+      <p class="muted">Usa el modo “inteligente” para que no corte frases ni diálogos.</p>
+      <div class="two">
+        <div>
+          <label for="chunkSize">Tamaño objetivo del fragmento (caracteres)</label>
+          <input id="chunkSize" type="number" value="1000" />
+        </div>
+        <div>
+          <label for="chunkOverlap">Solapado (caracteres aprox.)</label>
+          <input id="chunkOverlap" type="number" value="150" />
+        </div>
+      </div>
+      <div class="actions" style="margin-top:1rem; display:flex; gap:1rem; flex-wrap:wrap;">
+        <button id="btnChunkSmart">Trocear (inteligente)</button>
+        <button id="btnChunkSimple" class="secondary">Trocear (simple)</button>
+        <span class="muted" id="chunkInfo"></span>
+      </div>
+      <div id="err3" class="error" style="display:none"></div>
+      <div class="nav-buttons">
+        <button type="button" class="secondary" id="prev3">← Anterior</button>
+        <div class="right">
+          <button type="button" id="next3">Siguiente →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 4 -->
+    <div class="card step-card" data-step="4" style="display:none">
+      <h2>4. Configuración del chatbot</h2>
+      <label for="botName">Nombre del bot</label>
+      <input id="botName" value="Asistente del libro" />
+      <label for="systemPrompt">System prompt</label>
+      <textarea id="systemPrompt">Eres un asistente literario. Solo puedes responder sobre este libro. Si no está en tu contexto, responde: "Eso no está en este libro (o no está en el fragmento que tengo)."</textarea>
+      <div class="two">
+        <div>
+          <label for="model">Modelo (frontend)</label>
+          <input id="model" value="gpt-4o-mini" />
+        </div>
+        <div>
+          <label for="apiBase">API base (opcional)</label>
+          <input id="apiBase" placeholder="https://api.openai.com/v1" />
+        </div>
+      </div>
+      <div class="nav-buttons">
+        <button type="button" class="secondary" id="prev4">← Anterior</button>
+        <div class="right">
+          <button type="button" id="next4">Siguiente →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 5 -->
+    <div class="card step-card" data-step="5" style="display:none">
+      <h2>5. Exportar</h2>
+      <p class="muted">Descarga y súbelo a GitHub Pages en la carpeta del libro.</p>
+      <div style="display:flex; gap:1rem; flex-wrap:wrap;">
+        <button id="exportBook">Descargar book.json</button>
+        <button id="exportConfig">Descargar config.json</button>
+        <button id="exportChat">Descargar chat.html</button>
+      </div>
+      <h3>Previsualización</h3>
+      <pre id="preview"></pre>
+      <div class="nav-buttons">
+        <button type="button" class="secondary" id="prev5">← Anterior</button>
+      </div>
+    </div>
   </div>
+
+  <script>
+    // 1) pdf.js opcional
+    let pdfAvailable = typeof pdfjsLib !== "undefined";
+    if (pdfAvailable) {
+      try {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+      } catch (e) {
+        console.warn("No pude configurar worker de pdf.js", e);
+        pdfAvailable = false;
+      }
+    }
+
+    // 2) navegación
+    const steps = document.querySelectorAll(".step");
+    const cards = document.querySelectorAll(".step-card");
+    function showStep(n) {
+      steps.forEach(s => s.classList.toggle("active", Number(s.dataset.step) === n));
+      cards.forEach(c => c.style.display = Number(c.dataset.step) === n ? "block" : "none");
+    }
+    steps.forEach(s => s.addEventListener("click", () => showStep(Number(s.dataset.step))));
+
+    // 3) estado global
+    let pdfText = "";       // texto extraído del PDF
+    let chunks = [];        // lista de fragmentos finales
+
+    // 4) lectura de PDF
+    const pdfInput = document.getElementById("pdfInput");
+    const pdfStatus = document.getElementById("pdfStatus");
+
+    if (pdfInput) {
+      pdfInput.addEventListener("change", async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        if (!pdfAvailable) {
+          pdfStatus.textContent = "pdf.js no está disponible, pega el texto abajo.";
+          return;
+        }
+        pdfStatus.textContent = "Leyendo PDF...";
+        try {
+          const arrayBuffer = await file.arrayBuffer();
+          const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+          let fullText = "";
+          for (let i = 1; i <= pdf.numPages; i++) {
+            const page = await pdf.getPage(i);
+            const content = await page.getTextContent();
+            const strings = content.items.map(it => it.str);
+            fullText += strings.join(" ") + "\n\n";
+          }
+          pdfText = fullText.trim();
+          pdfStatus.textContent = `PDF leído. ${pdf.numPages} páginas. ${pdfText.length} caracteres.`;
+        } catch (err) {
+          console.error(err);
+          pdfStatus.textContent = "Error leyendo PDF. Usa el texto manual.";
+        }
+      });
+    }
+
+    // 5) troceo SIMPLE (por si quieres ver la diferencia)
+    function makeChunksSimple() {
+      const size = Number(document.getElementById("chunkSize").value) || 1000;
+      const overlap = Number(document.getElementById("chunkOverlap").value) || 0;
+      const baseText = pdfText || document.getElementById("manualText").value || "";
+      const res = [];
+      let start = 0;
+      while (start < baseText.length) {
+        const end = start + size;
+        res.push(baseText.slice(start, end));
+        start = end - overlap;
+      }
+      chunks = res;
+      document.getElementById("chunkInfo").textContent = `Generados ${chunks.length} fragmentos (simple).`;
+      updatePreview();
+    }
+
+    // 6) troceo INTELIGENTE
+    function makeChunksSmart() {
+      const size = Number(document.getElementById("chunkSize").value) || 1000;
+      const overlapChars = Number(document.getElementById("chunkOverlap").value) || 150;
+      const raw = pdfText || document.getElementById("manualText").value || "";
+      const text = raw.replace(/\r/g, "").replace(/\n{3,}/g, "\n\n");
+      if (!text.trim()) {
+        document.getElementById("chunkInfo").textContent = "No hay texto para trocear.";
+        return;
+      }
+
+      // dividimos por fin de frase (., !, ?, …) o por salto de párrafo (dos \n)
+      const parts = text.split(/(?<=[.!?])\s+|\n{2,}/g);
+      const result = [];
+      let current = "";
+
+      for (let i = 0; i < parts.length; i++) {
+        const sentence = (parts[i] || "").trim();
+        if (!sentence) continue;
+
+        // si al añadir la frase me paso del tamaño → cierro chunk
+        if ((current + " " + sentence).length > size) {
+          result.push(current.trim());
+
+          // solapado: mantenemos las últimas X *caracteres aproximados en palabras*
+          const words = current.split(/\s+/);
+          const avgWord = 5;
+          const wordsToKeep = Math.floor(overlapChars / avgWord);
+          const overlapWords = words.slice(-wordsToKeep).join(" ");
+
+          current = overlapWords + " " + sentence;
+        } else {
+          current += (current ? " " : "") + sentence;
+        }
+      }
+      if (current.trim()) result.push(current.trim());
+
+      chunks = result;
+      document.getElementById("chunkInfo").textContent = `Generados ${chunks.length} fragmentos (inteligente).`;
+      updatePreview();
+    }
+
+    // 7) conectar botones de troceo
+    document.getElementById("btnChunkSmart").addEventListener("click", makeChunksSmart);
+    document.getElementById("btnChunkSimple").addEventListener("click", makeChunksSimple);
+
+    // 8) generar JSONs
+    function buildBookJSON() {
+      const bookId = document.getElementById("bookId").value.trim();
+      const bookTitle = document.getElementById("bookTitle").value.trim();
+      const bookAuthor = document.getElementById("bookAuthor").value.trim();
+      return {
+        book_id: bookId,
+        title: bookTitle,
+        author: bookAuthor,
+        chunks: (chunks || []).map((t, i) => ({
+          id: `${bookId}-${i}`,
+          text: t
+        }))
+      };
+    }
+    function buildConfigJSON() {
+      return {
+        bot_name: document.getElementById("botName").value.trim(),
+        system_prompt: document.getElementById("systemPrompt").value.trim(),
+        model: document.getElementById("model").value.trim(),
+        api_base: document.getElementById("apiBase").value.trim(),
+        book_id: document.getElementById("bookId").value.trim()
+      };
+    }
+    function updatePreview() {
+      document.getElementById("preview").textContent = JSON.stringify(buildBookJSON(), null, 2);
+    }
+
+    // 9) descargas
+    function download(filename, content, type="application/json") {
+      const blob = new Blob([content], {type});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    document.getElementById("exportBook").addEventListener("click", () => {
+      download("book.json", JSON.stringify(buildBookJSON(), null, 2));
+    });
+    document.getElementById("exportConfig").addEventListener("click", () => {
+      download("config.json", JSON.stringify(buildConfigJSON(), null, 2));
+    });
+    document.getElementById("exportChat").addEventListener("click", () => {
+      const cfg = buildConfigJSON();
+      const html = generateChatHTML(cfg);
+      download("chat.html", html, "text/html");
+    });
+
+    // 10) HTML de chat
+    function generateChatHTML(cfg) {
+      return `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Chat – ${cfg.bot_name}</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <style>
+    body { font-family: system-ui, sans-serif; background:#0f172a; color:#e2e8f0; margin:0; height:100vh; display:flex; flex-direction:column; }
+    header { padding:1rem 1.5rem; background:rgba(15,23,42,.5); }
+    #chat { flex:1; overflow-y:auto; padding:1rem 1.5rem; display:flex; flex-direction:column; gap:1rem; }
+    .msg { max-width: 800px; }
+    .user { background:#38bdf8; color:#020617; margin-left:auto; border-radius:1rem 1rem 0 .5rem; padding:.6rem .8rem; }
+    .bot { background:rgba(15,23,42,.4); border:1px solid rgba(148,163,184,.1); border-radius:1rem 1rem 1rem .5rem; padding:.6rem .8rem;}
+    form { display:flex; gap:.5rem; padding:1rem 1.5rem; background:rgba(2,6,23,.6); }
+    input[type=text] { flex:1; padding:.6rem .7rem; border-radius:.75rem; border:1px solid rgba(148,163,184,.15); background:rgba(15,23,42,.4); color:white; }
+    button { background:#38bdf8; border:none; border-radius:.75rem; padding:.6rem 1rem; font-weight:600; cursor:pointer; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1 style="margin:0;font-size:1.05rem;">${cfg.bot_name}</h1>
+    <p style="opacity:.6">Libro: ${cfg.book_id}</p>
+  </header>
+  <div id="chat">
+    <div class="msg bot">Hola 👋 Pregúntame sobre este libro.</div>
+  </div>
+  <form id="form">
+    <input id="input" type="text" placeholder="Escribe tu pregunta..." autocomplete="off" />
+    <button>Enviar</button>
+  </form>
+  <script>
+    const chat = document.getElementById('chat');
+    const form = document.getElementById('form');
+    const input = document.getElementById('input');
+    let BOOK = null;
+    (async () => {
+      try {
+        const res = await fetch('./book.json');
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        BOOK = await res.json();
+      } catch (err) {
+        const div = document.createElement('div');
+        div.className = 'msg bot';
+        div.textContent = '⚠️ No pude cargar book.json. Coloca este archivo en el mismo directorio.';
+        chat.appendChild(div);
+      }
+    })();
+    function addMsg(t,who='bot'){const d=document.createElement('div');d.className='msg '+who;d.textContent=t;chat.appendChild(d);chat.scrollTop=chat.scrollHeight;}
+    form.addEventListener('submit',(e)=>{
+      e.preventDefault();
+      const q = input.value.trim();
+      if (!q) return;
+      addMsg(q,'user');
+      input.value='';
+      if (!BOOK) { addMsg('No he cargado el libro todavía.', 'bot'); return; }
+      const best = BOOK.chunks
+        .map(c => ({...c, score: score(q, c.text)}))
+        .sort((a,b) => b.score - a.score)
+        .slice(0,4);
+      const ctx = best.map(b => b.text).join('\\n\\n');
+      if (!ctx.trim()) {
+        addMsg('Eso no está en este libro (o no está en el fragmento que tengo).', 'bot');
+      } else {
+        addMsg('Según el libro: ' + ctx.slice(0, 500) + (ctx.length>500 ? '...' : ''), 'bot');
+      }
+    });
+    function score(q,t) {
+      q=q.toLowerCase(); t=t.toLowerCase();
+      return q.split(/\\s+/).reduce((acc,w)=>acc+(t.includes(w)?1:0),0);
+    }
+  <\/script>
+</body>
+</html>`;
+    }
+
+    // 11) navegación entre pasos
+    document.getElementById("next1").addEventListener("click", () => {
+      const id = document.getElementById("bookId").value.trim();
+      const title = document.getElementById("bookTitle").value.trim();
+      const err = document.getElementById("err1");
+      if (!id || !title) {
+        err.textContent = "Pon al menos ID y Título.";
+        err.style.display = "block";
+        return;
+      }
+      err.style.display = "none";
+      showStep(2);
+    });
+
+    document.getElementById("prev2").addEventListener("click", () => showStep(1));
+    document.getElementById("next2").addEventListener("click", () => {
+      const err = document.getElementById("err2");
+      const manual = document.getElementById("manualText").value.trim();
+      if (!pdfText && !manual) {
+        err.textContent = "Sube un PDF o pega el texto.";
+        err.style.display = "block";
+        return;
+      }
+      err.style.display = "none";
+      // hacemos un primer troceo inteligente al pasar al 3
+      makeChunksSmart();
+      showStep(3);
+    });
+
+    document.getElementById("prev3").addEventListener("click", () => showStep(2));
+    document.getElementById("next3").addEventListener("click", () => {
+      const err = document.getElementById("err3");
+      if (!chunks.length) {
+        err.textContent = "No hay fragmentos. Pulsa 'Trocear'.";
+        err.style.display = "block";
+        return;
+      }
+      err.style.display = "none";
+      showStep(4);
+    });
+
+    document.getElementById("prev4").addEventListener("click", () => showStep(3));
+    document.getElementById("next4").addEventListener("click", () => {
+      updatePreview();
+      showStep(5);
+    });
+
+    document.getElementById("prev5").addEventListener("click", () => showStep(4));
+  </script>
 </body>
 </html>
