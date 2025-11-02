@@ -1,7 +1,0 @@
-{
-  "bot_name": "Asistente del libro 1",
-  "system_prompt": "Eres un asistente literario. Solo puedes responder sobre este libro. Si no está en tu contexto, responde: \"Eso no está en este libro (o no está en el fragmento que tengo).\"",
-  "model": "gpt-4o-mini",
-  "api_base": "",
-  "book_id": "Book1_test"
-}
